@@ -1,10 +1,15 @@
-// use core::starknet::storage::Map;
 use core::starknet::ContractAddress;
+// use core::starknet::storage::Map;
 
 #[starknet::interface]
 pub trait IInnov8Pulse<TContractState> {
     fn submit_project(
-        ref self: TContractState, project_id: felt252, project_name: felt252, description: felt252
+        ref self: TContractState,
+        project_id: felt252,
+        project_name: felt252,
+        description: felt252,
+        contributors: felt252,
+        tags: felt252
     );
     fn get_project(self: @TContractState, project_id: felt252) -> Innov8Pulse::Project;
     fn track_contribution(
@@ -28,23 +33,10 @@ mod Innov8Pulse {
     #[storage]
     struct Storage {
         projects: Map::<felt252, Project>,
-        project_ids: Map::<u128, felt252>, // Simulate an array with Map using index
-        contributions: Map::<
-            felt252, Map<ContractAddress, felt252>
-        >, // project_id => contributor => contribution
-        feedbacks: Map::<
-            felt252, Map<ContractAddress, felt252>
-        >, // project_id => mentor => feedback
+        project_ids: Map::<u128, felt252>,
+        contributions: Map::<felt252, Map<ContractAddress, felt252>>,
+        feedbacks: Map::<felt252, Map<ContractAddress, felt252>>,
         total_projects: u128,
-    }
-
-    #[event]
-    #[derive(Drop, starknet::Event)]
-    enum Event {
-        ProjectSubmitted: ProjectSubmitted,
-        ContributionTracked: ContributionTracked,
-        FeedbackProvided: FeedbackProvided,
-        AllProjectsRetrieved: AllProjectsRetrieved,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -86,6 +78,8 @@ mod Innov8Pulse {
         project_name: felt252,
         description: felt252,
         owner: ContractAddress,
+        contributors: felt252,
+        tags: felt252
     }
 
     #[constructor]
@@ -97,26 +91,27 @@ mod Innov8Pulse {
             ref self: ContractState,
             project_id: felt252,
             project_name: felt252,
-            description: felt252
+            description: felt252,
+            contributors: felt252,
+            tags: felt252
         ) {
             let caller = get_caller_address();
-
+        
             let project = Project {
                 project_id: project_id,
                 project_name: project_name,
                 description: description,
                 owner: caller,
+                contributors: contributors,
+                tags: tags,
             };
-
+        
             self.projects.entry(project_id).write(project);
-
-            // Store the project ID in the project_ids map using the total_projects as an index
+        
             let index = self.total_projects.read();
             self.project_ids.entry(index).write(project_id);
-
             self.total_projects.write(index + 1);
-
-            // Emit the project submitted event
+        
             ProjectSubmitted {
                 project_id: project_id,
                 project_name: project_name,
@@ -135,10 +130,8 @@ mod Innov8Pulse {
             contribution: felt252
         ) {
             let mut project_contributions = self.contributions.entry(project_id);
-
             project_contributions.entry(contributor).write(contribution);
 
-            // Emit the contribution tracked event
             ContributionTracked {
                 project_id: project_id,
                 contributor: contributor,
@@ -150,10 +143,8 @@ mod Innov8Pulse {
             ref self: ContractState, project_id: felt252, feedback: felt252, mentor: ContractAddress
         ) {
             let mut project_feedbacks = self.feedbacks.entry(project_id);
-
             project_feedbacks.entry(mentor).write(feedback);
 
-            // Emit the feedback provided event
             FeedbackProvided { 
                 project_id: project_id, 
                 mentor: mentor, 
@@ -164,17 +155,15 @@ mod Innov8Pulse {
         fn get_all_projects(self: @ContractState) {
             let project_count = self.total_projects.read();
 
-            // Loop through the project_ids map and emit all projects as events
             for i in 0..project_count {
                 let project_id = self.project_ids.entry(i).read();
-                let project = self.projects.entry(project_id).read();
+                let _project = self.projects.entry(project_id).read();
 
-                // Emit event for each project
                 AllProjectsRetrieved {
-                    project_id: project.project_id,
-                    project_name: project.project_name,
-                    description: project.description,
-                    owner: project.owner,
+                    project_id: _project.project_id,
+                    project_name: _project.project_name,
+                    description: _project.description,
+                    owner: _project.owner,
                 };
             }
         }
